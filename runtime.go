@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dop251/goja/file"
 	"go/ast"
 	"hash/maphash"
 	"math"
@@ -2378,14 +2377,14 @@ func (r *Runtime) tryFunc(f func()) (err error) {
 }
 
 func (r *Runtime) try(f func()) error {
-	if ex := r.vm.try(f); ex != nil {
+	if ex := r.vm.try(r.ctx, f); ex != nil {
 		return ex
 	}
 	return nil
 }
 
 func (r *Runtime) tryPanic(f func()) {
-	if ex := r.vm.try(f); ex != nil {
+	if ex := r.vm.try(r.ctx, f); ex != nil {
 		panic(ex)
 	}
 }
@@ -2498,11 +2497,9 @@ func (r *Runtime) iterate(iter *Object, step func(Value)) {
 		err := r.tryFunc(func() {
 			step(nilSafe(res.self.getStr("value", nil)))
 		})
-		if ret != nil {
-			_ = r.tryFunc(func() {
-				returnIter(iter)
-			})
-			panic(ret)
+		if err != nil {
+			returnIter(iter)
+			panic(err)
 		}
 	}
 }

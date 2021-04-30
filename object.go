@@ -6,6 +6,7 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"sync"
 
 	"github.com/dop251/goja/unistring"
 )

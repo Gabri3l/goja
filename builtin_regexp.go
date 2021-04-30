@@ -1222,23 +1222,6 @@ func (r *Runtime) createRegExpStringIteratorPrototype(val *Object) objectImpl {
 	return o
 }
 
-func (r *Runtime) regExpStringIteratorProto_next(call FunctionCall) Value {
-	thisObj := r.toObject(call.This)
-	if iter, ok := thisObj.self.(*regExpStringIterObject); ok {
-		return iter.next()
-	}
-	panic(r.NewTypeError("Method RegExp String Iterator.prototype.next called on incompatible receiver %s", thisObj.String()))
-}
-
-func (r *Runtime) createRegExpStringIteratorPrototype(val *Object) objectImpl {
-	o := newBaseObjectObj(val, r.global.IteratorPrototype, classObject)
-
-	o._putProp("next", r.newNativeFunc(r.regExpStringIteratorProto_next, nil, "next", nil, 0), true, false, true)
-	o._putSym(SymToStringTag, valueProp(asciiString(classRegExpStringIterator), false, false, true))
-
-	return o
-}
-
 func (r *Runtime) initRegExp() {
 	o := r.newGuardedObject(r.global.ObjectPrototype, classObject)
 	r.global.RegExpPrototype = o.val

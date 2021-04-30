@@ -1,11 +1,11 @@
 package goja
 
 import (
-	"github.com/dop251/goja/parser"
-	"github.com/dop251/goja/unistring"
+	"math"
 	"testing"
 
 	"github.com/dop251/goja/parser"
+	"github.com/dop251/goja/unistring"
 )
 
 func TestVM1(t *testing.T) {

@@ -2040,192 +2040,6 @@ func TestAbandonedEnumerate(t *testing.T) {
 	testScript1(SCRIPT, asciiString("baz-foo foo-foo bar-foo "), t)
 }
 
-func TestNativeCtorNonNewCall(t *testing.T) {
-	vm := New()
-	vm.Set(`Animal`, func(call ConstructorCall) *Object {
-		obj := call.This
-		obj.Set(`name`, call.Argument(0).String())
-		obj.Set(`eat`, func(call FunctionCall) Value {
-			self := call.This.(*Object)
-			return vm.ToValue(fmt.Sprintf("%s eat", self.Get(`name`)))
-		})
-		return nil
-	})
-	v, err := vm.RunString(`
-
-	function __extends(d, b){
-		function __() {
-			this.constructor = d;
-		}
-		d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-	}
-
-	var Cat = (function (_super) {
-		__extends(Cat, _super);
-		function Cat() {
-			return _super.call(this, "cat") || this;
-		}
-		return Cat;
-	}(Animal));
-
-	var cat = new Cat();
-	cat instanceof Cat && cat.eat() === "cat eat";
-	`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if v != valueTrue {
-		t.Fatal(v)
-	}
-}
-
-func ExampleNewSymbol() {
-	sym1 := NewSymbol("66")
-	sym2 := NewSymbol("66")
-	fmt.Printf("%s %s %v", sym1, sym2, sym1.Equals(sym2))
-	// Output: 66 66 false
-}
-
-func ExampleObject_SetSymbol() {
-	type IterResult struct {
-		Done  bool
-		Value Value
-	}
-
-	vm := New()
-	vm.SetFieldNameMapper(UncapFieldNameMapper()) // to use IterResult
-
-	o := vm.NewObject()
-	o.SetSymbol(SymIterator, func() *Object {
-		count := 0
-		iter := vm.NewObject()
-		iter.Set("next", func() IterResult {
-			if count < 10 {
-				count++
-				return IterResult{
-					Value: vm.ToValue(count),
-				}
-			}
-			return IterResult{
-				Done: true,
-			}
-		})
-		return iter
-	})
-	vm.Set("o", o)
-
-	res, err := vm.RunString(`
-	var acc = "";
-	for (var v of o) {
-		acc += v + " ";
-	}
-	acc;
-	`)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(res)
-	// Output: 1 2 3 4 5 6 7 8 9 10
-}
-
-func ExampleRuntime_NewArray() {
-	vm := New()
-	array := vm.NewArray(1, 2, true)
-	vm.Set("array", array)
-	res, err := vm.RunString(`
-	var acc = "";
-	for (var v of array) {
-		acc += v + " ";
-	}
-	acc;
-	`)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(res)
-	// Output: 1 2 true
-}
-
-func ExampleRuntime_SetParserOptions() {
-	vm := New()
-	vm.SetParserOptions(parser.WithDisableSourceMaps)
-
-	res, err := vm.RunString(`
-	"I did not hang!";
-//# sourceMappingURL=/dev/zero`)
-
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(res.String())
-	// Output: I did not hang!
-}
-
-func TestRuntime_SetParserOptions_Eval(t *testing.T) {
-	vm := New()
-	vm.SetParserOptions(parser.WithDisableSourceMaps)
-
-	_, err := vm.RunString(`
-	eval("//# sourceMappingURL=/dev/zero");
-	`)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestNativeCallWithRuntimeParameter(t *testing.T) {
-	vm := New()
-	vm.Set("f", func(_ FunctionCall, r *Runtime) Value {
-		if r == vm {
-			return valueTrue
-		}
-		return valueFalse
-	})
-	ret, err := vm.RunString(`f()`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ret != valueTrue {
-		t.Fatal(ret)
-	}
-}
-
-func TestNestedEnumerate(t *testing.T) {
-	const SCRIPT = `
-	var o = {baz: true, foo: true, bar: true};
-	var res = "";
-	for (var i in o) {
-		delete o.baz;
-		Object.defineProperty(o, "hidden", {value: true, configurable: true});
-		for (var j in o) {
-			Object.defineProperty(o, "0", {value: true, configurable: true});
-			Object.defineProperty(o, "1", {value: true, configurable: true});
-			for (var k in o) {}
-			res += i + "-" + j + " ";
-		}
-	}
-	assert(compareArray(Reflect.ownKeys(o), ["0","1","foo","bar","hidden"]), "keys");
-	res;
-	`
-	testScript1(TESTLIB+SCRIPT, asciiString("baz-foo baz-bar foo-foo foo-bar bar-foo bar-bar "), t)
-}
-
-func TestAbandonedEnumerate(t *testing.T) {
-	const SCRIPT = `
-	var o = {baz: true, foo: true, bar: true};
-	var res = "";
-	for (var i in o) {
-		delete o.baz;
-		for (var j in o) {
-			res += i + "-" + j + " ";
-			break;
-		}
-	}
-	res;
-	`
-	testScript1(SCRIPT, asciiString("baz-foo foo-foo bar-foo "), t)
-}
-
 func TestDeclareGlobalFunc(t *testing.T) {
 	const SCRIPT = `
 	var initial;
@@ -2509,7 +2323,7 @@ func TestExceptionWithinNativeFunction(t *testing.T) {
 	expected := `TypeError: oh no!
 	at myNativeFunc (native)
 	at myFunc (<eval>:3:3(1))
-	at <eval>:5:8(7)
+	at <eval>:5:8(4)
 `
 	if ex.String() != expected {
 		t.Fatalf("Expected: \n%s\n but got \n%s", expected, ex.String())
@@ -2554,7 +2368,7 @@ func TestExceptionWithinAppliedNativeFunc(t *testing.T) {
 	expected := `TypeError: oh no!
 	at myNativeFunc (native)
 	at myFunc (<eval>:3:28(5))
-	at <eval>:5:8(7)
+	at <eval>:5:8(4)
 `
 	if ex.String() != expected {
 		t.Fatalf("Expected: \n%s\n but got \n%s", expected, ex.String())
@@ -2606,7 +2420,7 @@ func TestExceptionWithinAppliedObjectFunc(t *testing.T) {
 	expected := `Error: oh no!
 	at foo (<eval>:4:10(7))
 	at myFunc (<eval>:9:19(5))
-	at <eval>:12:8(11)
+	at <eval>:12:8(4)
 `
 	if ex.String() != expected {
 		t.Fatalf("Expected: \n%s\n but got \n%s", expected, ex.String())

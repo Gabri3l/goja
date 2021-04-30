@@ -20,7 +20,7 @@ const (
 type valueStack []Value
 
 type stash struct {
-	values    []Value
+	values    valueStack
 	extraArgs []Value
 	names     map[unistring.String]uint32
 	obj       *Object
@@ -87,7 +87,7 @@ type ref interface {
 
 type stashRef struct {
 	n   unistring.String
-	v   *[]Value
+	v   *valueStack
 	idx int
 }
 
@@ -551,7 +551,7 @@ func (vm *vm) try(ctx1 context.Context, f func()) (ex *Exception) {
 				iterTail := vm.iterStack[iterLen:]
 				for i := range iterTail {
 					if iter := iterTail[i].iter; iter != nil {
-						vm.try(func() {
+						vm.try(vm.ctx, func() {
 							returnIter(iter)
 						})
 					}
@@ -645,7 +645,7 @@ func (vm *vm) peek() Value {
 	return vm.stack[vm.sp-1]
 }
 
-func (vm *vm) saveCtx(ctx *context) {
+func (vm *vm) saveCtx(ctx *vmContext) {
 	ctx.prg, ctx.stash, ctx.newTarget, ctx.result, ctx.pc, ctx.sb, ctx.args =
 		vm.prg, vm.stash, vm.newTarget, vm.result, vm.pc, vm.sb, vm.args
 	if vm.funcName != "" {
@@ -663,12 +663,12 @@ func (vm *vm) pushCtx() {
 			err:   ex,
 		})
 	}
-	vm.callStack = append(vm.callStack, context{})
+	vm.callStack = append(vm.callStack, vmContext{})
 	ctx := &vm.callStack[len(vm.callStack)-1]
 	vm.saveCtx(ctx)
 }
 
-func (vm *vm) restoreCtx(ctx *context) {
+func (vm *vm) restoreCtx(ctx *vmContext) {
 	vm.prg, vm.funcName, vm.stash, vm.newTarget, vm.result, vm.pc, vm.sb, vm.args =
 		ctx.prg, ctx.funcName, ctx.stash, ctx.newTarget, ctx.result, ctx.pc, ctx.sb, ctx.args
 }
@@ -2147,7 +2147,7 @@ type resolveMixed struct {
 	strict bool
 }
 
-func newStashRef(typ varType, name unistring.String, v *[]Value, idx int) ref {
+func newStashRef(typ varType, name unistring.String, v *valueStack, idx int) ref {
 	switch typ {
 	case varTypeVar:
 		return &stashRef{
@@ -2234,7 +2234,7 @@ func (r *resolveMixedStack) exec(vm *vm) {
 		idx = vm.sb + r.idx
 	}
 
-	ref = newStashRef(r.typ, r.name, (*[]Value)(&vm.stack), idx)
+	ref = newStashRef(r.typ, r.name, (*valueStack)(&vm.stack), idx)
 
 end:
 	vm.refStack = append(vm.refStack, ref)
@@ -2253,7 +2253,7 @@ func (r *resolveMixedStack1) exec(vm *vm) {
 		stash = stash.outer
 	}
 
-	ref = newStashRef(r.typ, r.name, (*[]Value)(&vm.stack), vm.sb+r.idx)
+	ref = newStashRef(r.typ, r.name, (*valueStack)(&vm.stack), vm.sb+r.idx)
 
 end:
 	vm.refStack = append(vm.refStack, ref)
@@ -3223,7 +3223,7 @@ func (t try) exec(vm *vm) {
 		vm.pc = o + int(t.catchOffset)
 		// TODO: if ex.val is an Error, set the stack property
 		vm.push(ex.val)
-		ex = vm.runTry()
+		ex = vm.runTry(vm.ctx)
 	}
 
 	if t.finallyOffset > 0 {
@@ -3512,7 +3512,7 @@ func (jmp iterNext) exec(vm *vm) {
 	var res *Object
 	var done bool
 	var value Value
-	ex := vm.try(func() {
+	ex := vm.try(vm.ctx, func() {
 		res = vm.r.toObject(toMethod(iter.self.getStr("next", nil))(FunctionCall{This: iter}))
 		done = nilSafe(res.self.getStr("done", nil)).ToBoolean()
 		if !done {
