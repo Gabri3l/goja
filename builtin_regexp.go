@@ -774,7 +774,7 @@ func (r *Runtime) regexpproto_stdMatcherAll(call FunctionCall) Value {
 	flags := nilSafe(thisObj.self.getStr("flags", nil)).toString()
 	c := r.speciesConstructorObj(call.This.(*Object), r.global.RegExp)
 	matcher := r.toConstructor(c)([]Value{call.This, flags}, nil)
-	matcher.self.setOwnStr("lastIndex", valueInt(toLength(thisObj.Get("lastIndex"))), true)
+	matcher.self.setOwnStr("lastIndex", valueInt(toLength(thisObj.self.getStr("lastIndex", nil))), true)
 	flagsStr := flags.String()
 	global := strings.Contains(flagsStr, "g")
 	fullUnicode := strings.Contains(flagsStr, "u")
@@ -809,7 +809,7 @@ type regExpStringIterObject struct {
 
 // RegExpExec as defined in 21.2.5.2.1
 func regExpExec(r *Object, s valueString) Value {
-	exec := r.Get("exec")
+	exec := r.self.getStr("exec", nil)
 	if execObject, ok := exec.(*Object); ok {
 		if execFn, ok := execObject.self.assertCallable(); ok {
 			return r.runtime.regExpExec(execFn, r, s)
@@ -1203,6 +1203,23 @@ func (r *Runtime) regexpproto_stdReplacer(call FunctionCall) Value {
 	}
 
 	return stringReplace(call.ctx, s, found, replaceStr, rcall)
+}
+
+func (r *Runtime) regExpStringIteratorProto_next(call FunctionCall) Value {
+	thisObj := r.toObject(call.This)
+	if iter, ok := thisObj.self.(*regExpStringIterObject); ok {
+		return iter.next()
+	}
+	panic(r.NewTypeError("Method RegExp String Iterator.prototype.next called on incompatible receiver %s", thisObj.String()))
+}
+
+func (r *Runtime) createRegExpStringIteratorPrototype(val *Object) objectImpl {
+	o := newBaseObjectObj(val, r.global.IteratorPrototype, classObject)
+
+	o._putProp("next", r.newNativeFunc(r.regExpStringIteratorProto_next, nil, "next", nil, 0), true, false, true)
+	o._putSym(SymToStringTag, valueProp(asciiString(classRegExpStringIterator), false, false, true))
+
+	return o
 }
 
 func (r *Runtime) regExpStringIteratorProto_next(call FunctionCall) Value {
