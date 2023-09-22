@@ -1,0 +1,56 @@
+name: Sync with Original Goja
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # Every day at 7 AM
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout master branch
+        uses: actions/checkout@v3
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Configure Git User
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+      - name: Add and fetch upstream goja repository
+        run: |
+          git remote add upstream_goja https://github.com/dop251/goja.git
+          git fetch upstream_goja
+
+      - name: Check for new commits
+        id: check_commits
+        run: |
+          NEW_COMMITS=$(git rev-list --count master..upstream_goja/master)
+          if [[ $NEW_COMMITS -gt 0 ]]; then
+            echo "::set-output name=has_new_commits::true"
+          else
+            echo "::set-output name=has_new_commits::false"
+          fi
+
+      - name: Rebase onto upstream goja master
+        if: steps.check_commits.outputs.has_new_commits == 'true'
+        run: |
+          git rebase upstream_goja/master
+
+      - name: Remove remote rebased-master branch if it exists
+        if: steps.check_commits.outputs.has_new_commits == 'true'
+        run: |
+          git push origin --delete rebased-master || true  # Ignore failure if the branch doesn't exist
+
+      - name: Set remote using PAT
+        if: steps.check_commits.outputs.has_new_commits == 'true'
+        run: |
+          git remote set-url origin https://x-access-token:${{ secrets.MY_PAT }}@github.com/Gabri3l/goja.git
+
+      - name: Push to rebased-master branch
+        if: steps.check_commits.outputs.has_new_commits == 'true'
+        run: |
+          git push origin HEAD:rebased-master
