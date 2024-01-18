@@ -19,13 +19,15 @@ tasks:
       - command: shell.exec
         params:
           script: |
-            set -e
+            set -x
             export ROOT_DIR=`pwd`
             export GOROOT=$ROOT_DIR/go
             export PATH=$ROOT_DIR/go/bin:$PATH
 
+            echo "Running test suite..."
             cd goja
             go test -v ./... >> ${workdir}/goja.suite
+            echo "Test suite run completed."
       - command: gotest.parse_files
         params:
           files:
