@@ -734,7 +734,7 @@ func TestBaseObjectMemUsage(t *testing.T) {
 		{
 			name:      "should exit early on first iteration given an object over the memory limit",
 			threshold: 100,
-			memLimit:  0,
+			memLimit:  10,
 			val: &baseObject{
 				propNames: []unistring.String{
 					"test0",
@@ -758,7 +758,7 @@ func TestBaseObjectMemUsage(t *testing.T) {
 		{
 			name:      "should estimate memory given an empty object and negative threshold",
 			threshold: -1,
-			memLimit:  0,
+			memLimit:  10,
 			val: &baseObject{
 				propNames: []unistring.String{},
 				values:    map[unistring.String]Value{},
